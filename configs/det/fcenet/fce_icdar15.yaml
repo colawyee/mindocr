@@ -1,6 +1,6 @@
 system:
   mode: 1 # 0 for graph mode, 1 for pynative mode in MindSpore
-  distribute: True
+  distribute: False
   amp_level: 'O0'
   seed: 42
   # log_interval: 10
@@ -8,7 +8,7 @@ system:
   drop_overflow_update: False
 
 model:
-  resume: True
+  resume: False
   type: det
   transform: null
   backbone:
@@ -67,18 +67,9 @@ train:
     label_file: icda/train_det_gt.txt
     sample_ratio: 1.0
     transform_pipeline:
-      - DecodeImage:
-          img_mode: RGB
-          to_float32: False
-      - RandomColorAdjust:
-          brightness: 0.1255  # 32.0 / 255
-          saturation: 0.5
-      - NormalizeImage:
-          bgr_to_rgb: False
-          is_hwc: True
-          mean: imagenet
-          std: imagenet
-      - RandomScale:
+      - FDetLabelEncode:
+      - RandomScaling:
+          size: 800
           scale: [ 0.75,2.5 ] #(3. / 4, 5. / 2)
       - RandomCropFlip:
           crop_ratio: 0.5
@@ -89,6 +80,14 @@ train:
           rotate_ratio: 0.5
           max_angle: 30
           pad_with_fixed_color: False
+      - RandomColorAdjust:
+          brightness: 0.1255  # 32.0 / 255
+          saturation: 0.5
+      - NormalizeImage:
+          bgr_to_rgb: False
+          is_hwc: True
+          mean: imagenet
+          std: imagenet
       - SquareResizePad:
           target_size: 800
           pad_ratio: 0.6
@@ -119,10 +118,7 @@ eval:
     sample_ratio: 1.0
     shuffle: False
     transform_pipeline:
-      - DecodeImage:
-          img_mode: RGB
-          to_float32: False
-      - DetLabelEncode:
+      - FDetLabelEncode:
       - DetResizeForTest:
           rescale_img: [ 736, 736 ]
       - NormalizeImage:

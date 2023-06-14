@@ -12,15 +12,6 @@ import json
 import sys
 
 
-class FReadImage(object):
-    def __init__(self, **kwargs):
-        pass
-
-    def __call__(self, data):
-        data['image'] = cv2.imread(data['img_path'], cv2.IMREAD_COLOR)[:, :, ::-1]
-        return data
-
-
 class DetResizeForTest(object):
     def __init__(self, **kwargs):
         super(DetResizeForTest, self).__init__()
@@ -152,39 +143,13 @@ class DetResizeForTest(object):
         return img, [ratio_h, ratio_w]
 
 
-class FNormalizeImage(object):
-    """ normalize image such as substract mean, divide std
-    """
-
-    def __init__(self, scale=None, mean=None, std=None, order='chw', **kwargs):
-        if isinstance(scale, str):
-            scale = eval(scale)
-        self.scale = np.float32(scale if scale is not None else 1.0 / 255.0)
-        mean = mean if mean is not None else [0.485, 0.456, 0.406]
-        std = std if std is not None else [0.229, 0.224, 0.225]
-
-        shape = (3, 1, 1) if order == 'chw' else (1, 1, 3)
-        self.mean = np.array(mean).reshape(shape).astype('float32')
-        self.std = np.array(std).reshape(shape).astype('float32')
-
-    def __call__(self, data):
-        img = data['image']
-        from PIL import Image
-        if isinstance(img, Image.Image):
-            img = np.array(img)
-
-        assert isinstance(img,
-                          np.ndarray), "invalid input 'img' in NormalizeImage"
-        data['image'] = (img.astype('float32') * self.scale - self.mean) / self.std
-        return data
-
-
 class FDetLabelEncode(object):
     def __init__(self, min_area=100, **kwargs):
         self.min_area = min_area
         # pass
 
     def __call__(self, data):
+        data['image'] = cv2.imread(data['img_path'], cv2.IMREAD_COLOR)[:, :, ::-1]
         label = data['label']
         label = json.loads(label)
         nBox = len(label)
@@ -234,25 +199,6 @@ class FDetLabelEncode(object):
             ex_box = box + [box[-1]] * (max_points_num - len(box))
             ex_boxes.append(ex_box)
         return ex_boxes
-
-
-class ColorJitter:
-    def __init__(self, brightness=0.142, saturation=0.5, contrast=0.5, **kwargs):
-        self.transform = vision.RandomColorAdjust(brightness=brightness, saturation=saturation, contrast=0.5)
-
-    def __call__(self, data):
-        # img is rgb
-        img = data['image']  # [..., ::-1]
-        img = Image.fromarray(img)
-        img = img.convert('RGB')
-        img = self.transform(img)
-        img = np.asarray(img)
-        data['image'] = img
-        return data
-
-    def __repr__(self):
-        repr_str = self.__class__.__name__
-        return repr_str
 
 
 def imresize(img,
