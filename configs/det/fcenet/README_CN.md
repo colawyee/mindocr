@@ -13,6 +13,10 @@
 DBNet是一种基于分割的场景文本检测算法。在场景文本检测中，基于分割这类算法可以更加准确的描述各种形状的场景文本（比如弯曲形状的文本），而变得越来越流行。
 FCENet的一大亮点就是在任意不规则形状的文本场景上表现优异，这得益于它采用了可变形卷积和傅里叶变换技术。
 
+####可变形卷积
+
+可变形卷积的思想非常简单，就是将
+
 <p align="center"><img alt="Figure 1. Overall DBNet architecture" src="https://user-images.githubusercontent.com/16683750/225589619-d50c506c-e903-4f59-a316-8b62586c73a9.png" width="800"/></p>
 <p align="center"><em>图 1. DBNet整体架构图</em></p>
 
