@@ -10,109 +10,55 @@
 
 ### FCENet
 
-DBNet是一种基于分割的场景文本检测算法。在场景文本检测中，基于分割这类算法可以更加准确的描述各种形状的场景文本（比如弯曲形状的文本），而变得越来越流行。
-FCENet的一大亮点就是在任意不规则形状的文本场景上表现优异，这得益于它采用了可变形卷积和傅里叶变换技术。
+FCENet是一种基于分割的场景文本检测算法。在场景文本检测中，基于分割这类算法可以更加准确的描述各种形状的场景文本（比如弯曲形状的文本），而变得越来越流行。
+FCENet的一大亮点就是在任意不规则形状的文本场景上表现优异，这得益于它采用了可变形卷积[[1](#参考文献)]和傅里叶变换技术。
+除此之外，FCENet还具有后处理简单和高泛化性的优点，在少量训练数据上训练就可以达到很好的效果。
 
-####可变形卷积
+#### 可变形卷积
 
-可变形卷积的思想非常简单，就是将
+可变形卷积的思想非常简单，就是将原来固定形状的卷积核变成可变的，在原始卷积的位置基础上，可变形卷积会产生一个随机方向的位置偏移，如下图所示：
 
-<p align="center"><img alt="Figure 1. Overall DBNet architecture" src="https://user-images.githubusercontent.com/16683750/225589619-d50c506c-e903-4f59-a316-8b62586c73a9.png" width="800"/></p>
-<p align="center"><em>图 1. DBNet整体架构图</em></p>
+<p align="center"><img alt="Figure 1" src="https://github.com/colawyee/mindocr/assets/15730439/20cdb21d-f0b4-4fdf-a8dd-5833d84648ba" width="600"/></p>
+<p align="center"><em>图 1. 可变形卷积</em></p>
 
-DBNet的整体架构图如图1所示，包含以下阶段:
+图(a)是原始的卷积核，图(b)是产生了随机方向位置偏移的可变形卷积核，图(c)(d)是图(b)的两种特殊情况。可以看出，这样做的好处是可以提升卷积核的几何变换能力，使其不仅局限于原始卷积核矩形的形状，而是可以支持更丰富的不规则形状。可变形卷积对不规则形状特征提取的效果会更好[[1](#参考文献)]，也更加适用于自然场景的文本识别场景。
 
-1. 使用Resnet-50作为骨干网络，从2，3，4，5阶段进行不同层级的特征提取；
-2. 将提取到的特征放大，并以级联的方式与前一阶段提取到的特征加和；
-3. 将第2阶段的特征再次放大到与最大的特征图相同的尺寸，并沿着通道轴连接。
-4. 在最后的特征图（图中的深蓝色块）上应用3×3的卷积算子，和两个步长为2的去卷积算子来预测概率图和阈值图；
-5. 通过可微分二值化将概率图和阈值图合并为一个近似二值图单元近似二值图，并生成文本边界框。
+#### 傅里叶轮廓线
 
-### DBNet++
+傅里叶轮廓线是基于傅里叶变换的一种曲线拟合方法，随着傅里叶级数的项数k越大，就引入更多的高频信号，对轮廓刻画就越准确。下图展示了不同傅里叶级数情况下对不规则曲线的刻画能力：
 
-DBNet++架构与DBNet相似，是DBNet的延伸。两者唯一的区别是，DBNet直接拼接从主干网络中提取和缩放的特征，而DBNet++使用一个自适应的模块（Adaptive Scale Fusion, ASF）来融合这些特征，如图2所示。
-该模块可以自适应地融合不同尺寸的特征，有更好的尺寸（scale）鲁棒性。因此，DBNet++检测不同尺寸的文本的能力有显著提升。[[2](#参考文献)]
+<p align="center"><img width="445" alt="Image" src="https://github.com/colawyee/mindocr/assets/15730439/ae507f2f-ea4d-4787-90ea-4c59c634567a"></p>
+<p align="center"><em>图 2. 傅里叶轮廓线渐进估计效果</em></p>
 
-<p align="center"><img alt="Figure 2. Overall DBNet++ architecture" src="https://user-images.githubusercontent.com/16683750/236786997-13823b9c-ecaa-4bc5-8037-71299b3baffe.png" width="800"/></p>
-<p align="center"><em>图 2. DBNet++整体架构图</em></p>
+可以看出，随着傅里叶级数的项数k越大，其可以刻画的曲线是可以变得非常精细的。
 
-<p align="center"><img alt="Figure 3. Detailed architecture of the Adaptive Scale Fusion module" src="https://user-images.githubusercontent.com/16683750/236787093-c0c78d8f-e4f4-4c5e-8259-7120a14b0e31.png" width="700"/></p>
-<p align="center"><em>图 3. Adaptive Scale Fusion模块架构图</em></p>
+#### 傅里叶轮廓线编码
 
-ASF由两个注意力模块组成——阶段注意力模块（stage-wise attention）和空间注意力模块（spatial attention），后者集成在前者中，如图3所示。
-阶段注意模块学习不同尺寸的特征图的权重，而空间注意力模块学习跨空间维度的attention。这两个模块的组合使得模型可以获得尺寸（scale）鲁棒性很好的特征融合。
-DBNet++在检测不同尺寸的文本方面表现更好，尤其是对于尺寸较大的文本；然而，DBNet在检测尺寸较大的文本时可能会生成不准确或分离的检测框。
+傅里叶轮廓线编码是《Fourier Contour Embedding for Arbitrary-Shaped Text Detection》论文提出的一种将文本的轮廓的封闭曲线转化为一个向量（vector）的方法，也是FCENet算法需要用到的一种编码轮廓线的基础能力。傅里叶轮廓线编码方法通过在轮廓线上等间距的采样一些点，然后将采样的点的序列转化为傅里叶特征向量。值得注意的是，即使对于同一轮廓线，采样的点不同，对应生成的傅里叶特征向量也不相同。所以在采样的时候，需要限制起始点、间距和方向，保证对同一轮廓线生成的傅里叶特征向量的唯一性。
+
+#### FCENet算法框架
+
+<p align="center"><img width="800" alt="Image" src="https://github.com/colawyee/mindocr/assets/15730439/347aed5a-454c-4cfc-9577-fee163239626"></p>
+<p align="center"><em>图 3. FCENet算法框架图</em></p>
+
+像大多数OCR算法一样，FCENet的网络结构大体可以分为backbone，neck，head三个部分。其中backbone采用可变形卷积版本的Resnet50用于提取特征；neck部分采用特征金字塔[[2](#参考文献)]，特征金字塔是一组不同大小的卷积核，适用于提取原图中不同大小的特征，从而提高了目标检测的准确率，在一张图片中有不同大小的文本框的场景效果比较好；head部分有两条分支，一条是分类分支，用于计算文本区域和文本中心区域相较于监督信号的交叉熵损失，这两个部分加在一起作为分类分支的损失值，另一条是回归分支，通过最小化重构文本轮廓线和监督信号的轮廓线在图像空间的smooth-l1 loss，作为回归分支的损失值。
+
 
 ## 2. 实验结果
 
-DBNet和DBNet++在ICDAR2015，MSRA-TD500，SCUT-CTW1500，Total-Text和MLT2017数据集上训练。另外，我们在SynthText数据集上进行了预训练，并提供预训练权重下载链接。所有训练结果如下：
+MindOCR中的FCENet网络在数据集上训练。训练结果如下：
 
 ### ICDAR2015
 <div align="center">
 
 | **模型**              | **环境配置**       | **骨干网络**      | **预训练数据集** | **Recall** | **Precision** | **F-score** | **训练时间**     | **吞吐量**   | **配置文件**                            | **模型权重下载**                                                                                                                                                                                                |
 |---------------------|----------------|---------------|------------|------------|---------------|-------------|--------------|-----------|-------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| DBNet               | D910x1-MS2.0-G | MobileNetV3   | ImageNet       | 76.26%     | 78.22%        | 77.23%      | 10 s/epoch   | 100 img/s      | [yaml](db_mobilenetv3_icdar15.yaml) | [ckpt](https://download.mindspore.cn/toolkits/mindocr/dbnet/dbnet_mobilenetv3-62c44539.ckpt) \| [mindir](https://download.mindspore.cn/toolkits/mindocr/dbnet/dbnet_mobilenetv3-62c44539-f14c6a13.mindir) |
-| DBNet               | D910x1-MS2.0-G | ResNet-18     | ImageNet       | 80.12%     | 83.41%        | 81.73%      | 9.3 s/epoch  | 108 img/s      | [yaml](db_r18_icdar15.yaml)         | [ckpt](https://download.mindspore.cn/toolkits/mindocr/dbnet/dbnet_resnet18-0c0c4cfa.ckpt) \| [mindir](https://download.mindspore.cn/toolkits/mindocr/dbnet/dbnet_resnet18-0c0c4cfa-cf46eb8b.mindir)       |
-| DBNet               | D910x1-MS2.0-G | ResNet-50     | ImageNet       | 83.53%     | 86.62%        | 85.05%      | 13.3 s/epoch | 75.2 img/s       | [yaml](db_r50_icdar15.yaml)         | [ckpt](https://download.mindspore.cn/toolkits/mindocr/dbnet/dbnet_resnet50-c3a4aa24.ckpt) \| [mindir](https://download.mindspore.cn/toolkits/mindocr/dbnet/dbnet_resnet50-c3a4aa24-fbf95c82.mindir)       |
-|                     |                |               |            |            |               |             |              |           |                                     |                                                                                                                                                                                                           |
-| DBNet++             | D910x1-MS2.0-G | ResNet-50     | SynthText  | 85.70%     | 87.81%        | 86.74%      | 17.7 s/epoch | 56 img/s  | [yaml](db++_r50_icdar15.yaml)       | [ckpt](https://download.mindspore.cn/toolkits/mindocr/dbnet/dbnetpp_resnet50-068166c2.ckpt) \| [mindir](https://download.mindspore.cn/toolkits/mindocr/dbnet/dbnetpp_resnet50-068166c2-9934aff0.mindir)   |
+| FCENet               | D910x1-MS2.0-G | ResNet50   | ImageNet       | 81.5%     | 86.9%        | 84.1%      | 33 s/epoch   | 7 img/s      | [yaml](fce_icdar15.yaml) | [ckpt](https://download.mindspore.cn/toolkits/mindocr/dbnet/dbnet_mobilenetv3-62c44539.ckpt) \| [mindir](https://download.mindspore.cn/toolkits/mindocr/dbnet/dbnet_mobilenetv3-62c44539-f14c6a13.mindir) |
 
 </div>
 
 > 链接中模型DBNet的MindIR导出时的输入Shape为`(1,3,736,1280)`，模型DBNet++的MindIR导出时的输入Shape为`(1,3,1152,2048)`。
 
-### MSRA-TD500
-
-<div align="center">
-
-| **模型**         | **环境配置**    | **骨干网络** | **预训练数据集** | **Recall** | **Precision** | **F-score** | **训练时间** | **吞吐量** | **配置文件**                  | **模型权重下载**                                                                                                                                                                                         |
-|-------------------|----------------|--------------|----------------|------------|---------------|-------------|--------------|----------------|-----------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| DBNet            | D910x1-MS2.0-G | ResNet-18    | SynthText       | 79.55%     | 87.86%        | 83.50%      | 5.6 s/epoch  | 121.7 img/s      | [yaml](db_r18_td500.yaml) | [ckpt](https://download.mindspore.cn/toolkits/mindocr/dbnet/dbnet_resnet18_td500-b5abff68.ckpt)  |
-| DBNet            | D910x1-MS2.0-G | ResNet-50    | SynthText       | 83.68%     | 87.59%        | 85.59%      | 9.6 s/epoch  | 71.2 img/s      | [yaml](db_r50_td500.yaml) | [ckpt](https://download.mindspore.cn/toolkits/mindocr/dbnet/dbnet_resnet50_td500-0d12b5e8.ckpt)  |
-</div>
-
-> MSRA-TD500数据集有300训练集图片和200测试集图片，参考论文[Real-time Scene Text Detection with Differentiable Binarization](https://arxiv.org/abs/1911.08947)，我们训练此权重额外使用了来自HUST-TR400数据集的400训练集图片。可以在此下载全部[数据集](https://paddleocr.bj.bcebos.com/dataset/TD_TR.tar)用于训练。
-
-### SCUT-CTW1500
-
-<div align="center">
-
-| **模型**         | **环境配置**    | **骨干网络** | **预训练数据集** | **Recall** | **Precision** | **F-score** | **训练时间** | **吞吐量** | **配置文件**                  | **模型权重下载**                                                                                                                                                                                         |
-|-----------------|----------------|--------------|----------------|------------|---------------|-------------|--------------|----------------|-----------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| DBNet            | D910x1-MS2.0-G | ResNet-18    | SynthText       | 85.68%     | 85.33%        | 85.50%      | 8.2 s/epoch  | 122.1 img/s      | [yaml](db_r18_ctw1500.yaml) | [ckpt](https://download.mindspore.cn/toolkits/mindocr/dbnet/dbnet_resnet18_ctw1500-0864b040.ckpt)  |
-| DBNet            | D910x1-MS2.0-G | ResNet-50    | SynthText       | 86.72%     | 85.29%        | 86.00%      | 14.0 s/epoch  | 71.4 img/s      | [yaml](db_r50_ctw1500.yaml) | [ckpt](https://download.mindspore.cn/toolkits/mindocr/dbnet/dbnet_resnet50_ctw1500-f637e3d3.ckpt)  |
-</div>
-
-### Total-Text
-
-<div align="center">
-
-| **模型**         | **环境配置**    | **骨干网络** | **预训练数据集** | **Recall** | **Precision** | **F-score** | **训练时间** | **吞吐量** | **配置文件**                  | **模型权重下载**                                                                                                                                                                                         |
-|-----------------|----------------|--------------|----------------|------------|---------------|-------------|--------------|----------------|-----------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| DBNet            | D910x1-MS2.0-G | ResNet-18    | SynthText       | 83.66%     | 87.65%        | 85.61%      | 12.9 s/epoch   |  96.9 img/s     | [yaml](db_r18_totaltext.yaml) | [ckpt](https://download.mindspore.cn/toolkits/mindocr/dbnet/dbnet_resnet18_totaltext-fb456ff4.ckpt)  |
-| DBNet            | D910x1-MS2.0-G | ResNet-50    | SynthText       | 84.79%     | 87.07%        | 85.91%      |  18.0 s/epoch  |   69.1 img/s     | [yaml](db_r50_totaltext.yaml) | [ckpt](https://download.mindspore.cn/toolkits/mindocr/dbnet/dbnet_resnet50_totaltext-76d6f421.ckpt)  |
-</div>
-
-### MLT2017
-
-<div align="center">
-
-| **模型**         | **环境配置**    | **骨干网络** | **预训练数据集** | **Recall** | **Precision** | **F-score** | **训练时间** | **吞吐量** | **配置文件**                  | **模型权重下载**                                                                                                                                                                                         |
-|-----------------|---------------|-------------|----------------|------------|---------------|-------------|--------------|----------------|-----------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| DBNet           | D910x8-MS2.0-G | ResNet-18    | SynthText       | 72.55%     | 83.23%        | 77.52%      | 20.9 s/epoch  |  43.1 img/s      | [yaml](db_r18_mlt2017.yaml) | [ckpt](https://download.mindspore.cn/toolkits/mindocr/dbnet/dbnet_resnet18_mlt2017-5af33809.ckpt)  |
-| DBNet           | D910x8-MS2.0-G | ResNet-50    | SynthText      | 74.88%     | 83.77%        | 79.08%      | 23.6 s/epoch  |   38.2 img/s     | [yaml](db_r50_mlt2017.yaml) | [ckpt](https://download.mindspore.cn/toolkits/mindocr/dbnet/dbnet_resnet50_mlt2017-3bd6e569.ckpt)  |
-</div>
-
-### SynthText
-
-<div align="center">
-
-| **模型**         | **环境配置**    | **骨干网络** | **预训练数据集** | **训练Loss**| **训练时间** | **吞吐量** | **配置文件**                  | **模型权重下载**                 |
-|-----------------|----------------|--------------|----------------|---------|---------|---------------|-------------|--------------|
-| DBNet      | D910x1-MS2.0-G | ResNet-18    | ImageNet       |   2.41    |7075 s/epoch  | 121.37 img/s      | [yaml](db_r18_synthtext.yaml) | [ckpt](https://download.mindspore.cn/toolkits/mindocr/dbnet/dbnet_resnet18_synthtext-251ef3dd.ckpt)  |
-| DBNet      | D910x1-MS2.0-G | ResNet-50    | ImageNet       |   2.25    |10470 s/epoch  | 82.02 img/s      | [yaml](db_r50_synthtext.yaml) | [ckpt](https://download.mindspore.cn/toolkits/mindocr/dbnet/dbnet_resnet50_synthtext-40655acb.ckpt)  |
-</div>
 
 #### 注释：
 - 环境配置：训练的环境配置表示为 {处理器}x{处理器数量}-{MS模式}，其中 Mindspore 模式可以是 G-graph 模式或 F-pynative 模式。
@@ -149,145 +95,33 @@ DBNet和DBNet++在ICDAR2015，MSRA-TD500，SCUT-CTW1500，Total-Text和MLT2017�
     └── train_det_gt.txt
 ```
 
-#### 3.2.2 MSRA-TD500 数据集
 
-请从[该网址](http://www.iapr-tc11.org/mediawiki/index.php/MSRA_Text_Detection_500_Database_(MSRA-TD500))下载MSRA-TD500数据集，然后参考[数据转换](../../../tools/dataset_converters/README_CN.md)对数据集标注进行格式转换。
-
-完成数据准备工作后，数据的目录结构应该如下所示：
-
-```txt
-MSRA-TD500
- ├── test
- │   ├── IMG_0059.gt
- │   ├── IMG_0059.JPG
- │   ├── IMG_0080.gt
- │   ├── IMG_0080.JPG
- │   ├── ...
- │   ├── train_det_gt.txt
- ├── train
- │   ├── IMG_0030.gt
- │   ├── IMG_0030.JPG
- │   ├── IMG_0063.gt
- │   ├── IMG_0063.JPG
- │   ├── ...
- │   ├── test_det_gt.txt
-```
-
-#### 3.2.3 SCUT-CTW1500 数据集
-
-请从[该网址](https://github.com/Yuliang-Liu/Curve-Text-Detector)下载SCUT-CTW1500数据集，然后参考[数据转换](https://github.com/mindspore-lab/mindocr/blob/main/tools/dataset_converters/README_CN.md)对数据集标注进行格式转换。
-
-完成数据准备工作后，数据的目录结构应该如下所示：
-
-```txt
-ctw1500
- ├── test_images
- │   ├── 1001.jpg
- │   ├── 1002.jpg
- │   ├── ...
- ├── train_images
- │   ├── 0001.jpg
- │   ├── 0002.jpg
- │   ├── ...
- ├── test_det_gt.txt
- ├── train_det_gt.txt
-```
-
-#### 3.2.4 Total-Text 数据集
-
-请从[该网址](https://github.com/cs-chan/Total-Text-Dataset/tree/master/Dataset)下载Total-Text数据集，然后参考[数据转换](https://github.com/mindspore-lab/mindocr/blob/main/tools/dataset_converters/README_CN.md)对数据集标注进行格式转换。
-
-完成数据准备工作后，数据的目录结构应该如下所示：
-
-```txt
-totaltext
- ├── Images
- │   ├── Train
- │   │   ├── img1001.jpg
- │   │   ├── img1002.jpg
- │   │   ├── ...
- │   ├── Test
- │   │   ├── img1.jpg
- │   │   ├── img2.jpg
- │   │   ├── ...
- ├── test_det_gt.txt
- ├── train_det_gt.txt
-```
-
-#### 3.2.5 MLT2017 数据集
-MLT2017数据集是一个多语言文本检测识别数据集，包含中文、日文、韩文、英文、法文、阿拉伯文、意大利文、德文和印度文共9种语言。请从[该网址](https://rrc.cvc.uab.es/?ch=8&com=downloads)下载MLT2017数据集，解压后请将数据中格式为.gif的图像转化为.jpg或.png格式。然后参考[数据转换](https://github.com/mindspore-lab/mindocr/blob/main/tools/dataset_converters/README_CN.md)对数据集标注进行格式转换。
-
-完成数据准备工作后，数据的目录结构应该如下所示：
-
-```txt
-MLT_2017
- ├── train
- │   ├── img_1.png
- │   ├── img_2.png
- │   ├── img_3.jpg
- │   ├── img_4.jpg
- │   ├── ...
- ├── validation
- │   ├── img_1.jpg
- │   ├── img_2.jpg
- │   ├── ...
- ├── train_det_gt.txt
- ├── validation_det_gt.txt
-```
 > 用户如果想要使用自己的数据集进行训练，请参考[数据转换](https://github.com/mindspore-lab/mindocr/blob/main/tools/dataset_converters/README_CN.md)对数据集标注进行格式转换。并配置yaml文件，然后使用单卡或者多卡运行train.py进行训练即可，详细信息可参考下面几节教程。
-
-#### 3.2.6 SynthText 数据集
-
-请从[该网址](https://academictorrents.com/details/2dba9518166cbd141534cbf381aa3e99a087e83c)下载SynthText数据集，解压后的数据的目录结构应该如下所示：
-
-``` text
-.
-├── SynthText
-│   ├── 1
-│   │   ├── img_1.jpg
-│   │   ├── img_2.jpg
-│   │   └── ...
-│   ├── 2
-│   │   ├── img_1.jpg
-│   │   ├── img_2.jpg
-│   │   └── ...
-│   ├── ...
-│   ├── 200
-│   │   ├── img_1.jpg
-│   │   ├── img_2.jpg
-│   │   └── ...
-│   └── gt.mat
-
-```
-
-> :warning: 另外, 我们强烈建议在使用 `SynthText` 数据集之前先进行预处理，因为它包含一些错误的数据。可以使用下列的方式进行校正:
-> ```shell
-> python tools/dataset_converters/convert.py --dataset_name=synthtext --task=det --label_dir=/path-to-data-dir/SynthText/gt.mat --output_path=/path-to-data-dir/SynthText/gt_processed.mat
-> ```
-> 以上的操作会产生与`SynthText`原始标注格式相同但是是经过过滤后的标注数据.
 
 ### 3.3 配置说明
 
-在配置文件`configs/det/dbnet/db_r50_icdar15.yaml`中更新如下文件路径。其中`dataset_root`会分别和`data_dir`以及`label_file`拼接构成完整的数据集目录和标签文件路径。
+在配置文件`configs/det/fcenet/fce_icdar15.yaml`中更新如下文件路径。其中`dataset_root`会分别和`data_dir`以及`label_file`拼接构成完整的数据集目录和标签文件路径。
 
 ```yaml
 ...
 train:
-  ckpt_save_dir: './tmp_det'
+  ckpt_save_dir: './tmp_det_fcenet'
   dataset_sink_mode: False
+  ema: True
   dataset:
     type: DetDataset
     dataset_root: dir/to/dataset          <--- 更新
-    data_dir: train/images                <--- 更新
-    label_file: train/train_det_gt.txt    <--- 更新
+    data_dir: icda/ch4_training_images    <--- 更新
+    label_file: icda/train_det_gt.txt     <--- 更新
 ...
 eval:
+  ckpt_load_path: '/best.ckpt'            <--- 更新
   dataset_sink_mode: False
   dataset:
     type: DetDataset
     dataset_root: dir/to/dataset          <--- 更新
-    data_dir: test/images                 <--- 更新
-    label_file: test/test_det_gt.txt      <--- 更新
+    data_dir: icda/ch4_test_images        <--- 更新
+    label_file: icda/test_det_gt.txt      <--- 更新
 ...
 ```
 
@@ -295,28 +129,27 @@ eval:
 
 
 
-DBNet由3个部分组成：`backbone`、`neck`和`head`。具体来说:
+FCENet由3个部分组成：`backbone`、`neck`和`head`。具体来说:
 
 ```yaml
 model:
+  resume: False
   type: det
   transform: null
   backbone:
     name: det_resnet50  # 暂时只支持ResNet50
     pretrained: True    # 是否使用ImageNet数据集上的预训练权重
   neck:
-    name: DBFPN         # DBNet的特征金字塔网络
-    out_channels: 256
-    bias: False
-    use_asf: False      # DBNet++的自适应尺度融合模块 (仅供DBNet++使用)
+    name: FCEFPN        # FCENet的特征金字塔网络
+    out_channel: 256
   head:
-    name: DBHead
-    k: 50               # 可微分二值化的放大因子
-    bias: False
-    adaptive: True      # 训练时设置为True, 推理时设置为False
+    name: FCEHead
+    scales: [ 8, 16, 32 ]
+    alpha: 1.2
+    beta: 1.0
+    fourier_degree: 5
+    num_sample: 50
 ```
-
-[comment]: <> (_DBNet_和_DBNet++的唯一区别在于_Adaptive Scale Fusion_ module, 在`neck`模块中的 `use_asf`参数进行设置。)
 
 ### 3.4 训练
 
@@ -326,7 +159,7 @@ model:
 
 ``` shell
 # train dbnet on ic15 dataset
-python tools/train.py --config configs/det/dbnet/db_r50_icdar15.yaml
+python tools/train.py --config configs/det/fcenet/fce_icdar15.yaml
 ```
 
 * 分布式训练
@@ -335,7 +168,7 @@ python tools/train.py --config configs/det/dbnet/db_r50_icdar15.yaml
 
 ```shell
 # n is the number of GPUs/NPUs
-mpirun --allow-run-as-root -n 2 python tools/train.py --config configs/det/dbnet/db_r50_icdar15.yaml
+mpirun --allow-run-as-root -n 2 python tools/train.py --config configs/det/fcenet/fce_icdar15.yaml
 ```
 
 训练结果（包括checkpoint、每个epoch的性能和曲线图）将被保存在yaml配置文件的`ckpt_save_dir`参数配置的路径下，默认为`./tmp_det`。
@@ -345,7 +178,7 @@ mpirun --allow-run-as-root -n 2 python tools/train.py --config configs/det/dbnet
 评估环节，在yaml配置文件中将`ckpt_load_path`参数配置为checkpoint文件的路径，设置`distribute`为False，然后运行：
 
 ``` shell
-python tools/eval.py --config configs/det/dbnet/db_r50_icdar15.yaml
+python tools/eval.py --config configs/det/fcenet/fce_icdar15.yaml
 ```
 
 ### 3.6 MindSpore Lite 推理
@@ -375,7 +208,6 @@ python tools/export.py --model_name configs/det/dbnet/db_r50_icdar15.yaml --data
 
 - 执行推理
 
-
 假设在模型转换后得到output.mindir文件，在`deploy/py_infer`目录下使用以下命令进行推理：
 
 ```shell
@@ -384,7 +216,7 @@ python infer.py \
     --device=Ascend \
     --device_id=0 \
     --det_model_path=your_path_to/output.mindir \
-    --det_model_name_or_config=../../configs/det/dbnet/db_r50_icdar15.yaml \
+    --det_model_name_or_config=../../configs/det/fcenet/fce_icdar15.yaml \
     --backend=lite \
     --res_save_dir=results_dir
 ```
@@ -394,8 +226,6 @@ python infer.py \
 
 <!--- Guideline: Citation format GB/T 7714 is suggested. -->
 
-[1] Minghui Liao, Zhaoyi Wan, Cong Yao, Kai Chen, Xiang Bai. Real-time Scene Text Detection with Differentiable
-Binarization. arXiv:1911.08947, 2019
+[1] Dai, J., Qi, H., Xiong, Y., Li, Y., Zhang, G., Hu, H., & Wei, Y. (2017). Deformable Convolutional Networks. 2017 IEEE International Conference on Computer Vision (ICCV), 764-773.
 
-[2] Minghui Liao, Zhisheng Zou, Zhaoyi Wan, Cong Yao, Xiang Bai. Real-Time Scene Text Detection with Differentiable
-Binarization and Adaptive Scale Fusion. arXiv:2202.10304, 2022
+[2] T. Lin, et al., "Feature Pyramid Networks for Object Detection," in 2017 IEEE Conference on Computer Vision and Pattern Recognition (CVPR), Honolulu, HI, USA, 2017 pp. 936-944. doi: 10.1109/CVPR.2017.106
