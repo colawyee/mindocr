@@ -53,7 +53,7 @@ MindOCR中的FCENet网络在数据集上训练。训练结果如下：
 
 | **模型**              | **环境配置**       | **骨干网络**      | **预训练数据集** | **Recall** | **Precision** | **F-score** | **训练时间**     | **吞吐量**   | **配置文件**                            | **模型权重下载**                                                                                                                                                                                                |
 |---------------------|----------------|---------------|------------|------------|---------------|-------------|--------------|-----------|-------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| FCENet               | D910x4-MS2.0-F | ResNet50   | ImageNet       | 81.5%     | 86.9%        | 84.1%      | 33 s/epoch   | 7 img/s      | [yaml](fce_icdar15.yaml) | [ckpt](https://download.mindspore.cn/toolkits/mindocr/dbnet/dbnet_mobilenetv3-62c44539.ckpt) \| [mindir](https://download.mindspore.cn/toolkits/mindocr/dbnet/dbnet_mobilenetv3-62c44539-f14c6a13.mindir) |
+| FCENet               | D910x4-MS2.0-F | ResNet50   | ImageNet       | 81.5%     | 86.9%        | 84.1%      | 33 s/epoch   | 7 img/s      | [yaml](fce_icdar15.yaml) | [ckpt](https://download.mindspore.cn/toolkits/mindocr/fcenet/) \| [mindir](https://download.mindspore.cn/toolkits/mindocr/dbnet/dbnet_mobilenetv3-62c44539-f14c6a13.mindir) |
 
 </div>
 
